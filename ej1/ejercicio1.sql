@@ -113,15 +113,33 @@ INSERT INTO ej1.transacciones (cuenta_id, monto, fecha_transaccion, concepto_pag
 (25, 500.00, '2026-04-10 11:11:00+00', 'Pago liquidación 1'),
 (25, 500.00, '2026-04-10 11:12:30+00', 'Pago liquidación 2');-- DUPLICADA histórica (< 5 min)
 
-SELECT
+
+SELECT 
+    cu.cuenta_id,
+    c.nombre AS cliente,
+    cu.monto_original,
+    cu.saldo_pendiente,
+    cu.fecha_vencimiento,
+    CURRENT_DATE - cu.fecha_vencimiento AS dias_de_atraso
+FROM ej1.cuentas cu
+INNER JOIN ej1.clientes c ON cu.cliente_id = c.cliente_id
+WHERE cu.saldo_pendiente > 0
+  AND cu.fecha_vencimiento < CURRENT_DATE
+  AND cu.quebranto = FALSE
+ORDER BY cu.fecha_vencimiento ASC;
+
+SELECT 
     c.cliente_id,
-    c.nombre, 
-    COUNT(cu.cuenta_id) AS total_cuentas,
-    SUM(cu.monto_original) AS volumen_monto_original,
-    SUM(cu.saldo_pendiente) AS volumen_saldo_pendiente
-FROM ej1.clientes c 
-INNER JOIN ej1.cuentas cu ON c.cliente_id = cu.cliente_id
+    c.nombre,
+    COUNT(DISTINCT t.transaccion_id) AS total_transacciones,
+    COALESCE(SUM(t.monto), 0) AS volumen_transaccionado
+FROM ej1.clientes c
+INNER JOIN ej1.cuentas cu 
+    ON c.cliente_id = cu.cliente_id 
+   AND cu.quebranto = FALSE
+INNER JOIN ej1.transacciones t 
+    ON cu.cuenta_id = t.cuenta_id
 WHERE t.fecha_transaccion >= CURRENT_TIMESTAMP - INTERVAL '30 days'
-GROUP BY c.cliente_id, c.nombre
-ORDER BY volumen_monto_original DESC
+GROUP BY c.cliente_id, c.nombre, c.email
+ORDER BY volumen_transaccionado DESC
 LIMIT 5;
